@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "851119664928",
+    "project_id": "qrcodeapp-44a59",
+    "storage_bucket": "qrcodeapp-44a59.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:851119664928:android:bc6770b52fdff3d9a1f145",
+        "android_client_info": {
+          "package_name": "com.example.bezierqrcode"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEzfZXEtNu7QuxSyPSjznuXK-ePihZXXE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
