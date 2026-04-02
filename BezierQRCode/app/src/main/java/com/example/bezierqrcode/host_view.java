@@ -4,29 +4,25 @@ import android.graphics.Bitmap;
 import android.os.Bundle;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
-import com.google.firebase.database.DataSnapshot;
-import com.google.firebase.database.DatabaseError;
-import com.google.firebase.database.DatabaseReference;
-import com.google.firebase.database.FirebaseDatabase;
-import com.google.firebase.database.ValueEventListener;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.zxing.BarcodeFormat;
 import com.journeyapps.barcodescanner.BarcodeEncoder;
 
-import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
 
 public class host_view extends AppCompatActivity {
 
     private TextView idTV;
     private ImageView qrCodeIV;
     private TextView participantsTV;
-    private DatabaseReference mDatabase;
-    private String lobbyId;
+    private FirebaseFirestore db;
+    private String sessionId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -37,42 +33,65 @@ public class host_view extends AppCompatActivity {
         qrCodeIV = findViewById(R.id.qrCodeIV);
         participantsTV = findViewById(R.id.participantsTV);
 
-        mDatabase = FirebaseDatabase.getInstance().getReference();
+        db = FirebaseFirestore.getInstance();
 
-        // Generate a unique lobby ID
-        lobbyId = UUID.randomUUID().toString().substring(0, 8);
-        idTV.setText("ID: " + lobbyId);
+        createAttendanceSession();
+    }
 
-        // Save lobby to Firebase
-        FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
-        if (user != null) {
-            mDatabase.child("lobbies").child(lobbyId).child("host").setValue(user.getEmail());
+    private void createAttendanceSession() {
+        long timestamp = System.currentTimeMillis();
+        // Generate a shorter, 6-character alphanumeric ID for easier manual entry
+        sessionId = generateShortId(6);
+        String hostId = "SESSION-" + timestamp + "-" + new Random().nextInt(1000);
+
+        Map<String, Object> sessionData = new HashMap<>();
+        sessionData.put("active", true);
+        sessionData.put("attendeeCount", 0);
+        sessionData.put("hostId", hostId);
+        sessionData.put("sessionId", sessionId);
+        sessionData.put("sessionName", "New Session");
+        sessionData.put("timestamp", timestamp);
+
+        // Explicitly set the document ID to our custom sessionId
+        db.collection("attendance_sessions").document(sessionId)
+                .set(sessionData)
+                .addOnSuccessListener(aVoid -> {
+                    idTV.setText("Session ID: " + sessionId);
+                    generateQRCode(sessionId);
+                    listenForAttendees(sessionId);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(this, "Failed to create session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private String generateShortId(int length) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder sb = new StringBuilder();
+        Random random = new Random();
+        for (int i = 0; i < length; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
         }
+        return sb.toString();
+    }
 
-        // Generate and display the QR code
+    private void generateQRCode(String data) {
         try {
             BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
-            Bitmap bitmap = barcodeEncoder.encodeBitmap(lobbyId, BarcodeFormat.QR_CODE, 400, 400);
+            Bitmap bitmap = barcodeEncoder.encodeBitmap(data, BarcodeFormat.QR_CODE, 400, 400);
             qrCodeIV.setImageBitmap(bitmap);
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
 
-        // Listen for participants
-        mDatabase.child("lobbies").child(lobbyId).child("participants")
-                .addValueEventListener(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        StringBuilder participants = new StringBuilder("Participants:\n");
-                        for (DataSnapshot participant : snapshot.getChildren()) {
-                            participants.append(participant.getValue(String.class)).append("\n");
-                        }
-                        participantsTV.setText(participants.toString());
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        // Error handle
+    private void listenForAttendees(String sessionId) {
+        db.collection("attendance_sessions").document(sessionId)
+                .addSnapshotListener((snapshot, e) -> {
+                    if (e != null) return;
+                    if (snapshot != null && snapshot.exists()) {
+                        Long count = snapshot.getLong("attendeeCount");
+                        participantsTV.setText("Attendees: " + (count != null ? count : 0));
                     }
                 });
     }

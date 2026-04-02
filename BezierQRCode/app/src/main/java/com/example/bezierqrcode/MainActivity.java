@@ -7,77 +7,108 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.graphics.Insets;
-import androidx.core.view.ViewCompat;
-import androidx.core.view.WindowInsetsCompat;
 
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.firestore.FirebaseFirestore;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
-    private EditText emailET;
-    private EditText passwordET;
-    private Button signBTN;
+    private EditText emailET, passwordET, firstNameET, lastNameET;
+    private Button signBTN, signUpBTN;
     private FirebaseAuth mAuth;
+    private FirebaseFirestore db;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        EdgeToEdge.enable(this);
         setContentView(R.layout.activity_main);
 
         mAuth = FirebaseAuth.getInstance();
-
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+        db = FirebaseFirestore.getInstance();
 
         emailET = findViewById(R.id.emailET);
         passwordET = findViewById(R.id.passwordET);
+        firstNameET = findViewById(R.id.firstNameET);
+        lastNameET = findViewById(R.id.lastNameET);
         signBTN = findViewById(R.id.signBTN);
+        signUpBTN = findViewById(R.id.signUpBTN);
 
-        signBTN.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String email = emailET.getText().toString().trim();
-                String password = passwordET.getText().toString().trim();
-
-                if (email.isEmpty() || password.isEmpty()) {
-                    Toast.makeText(MainActivity.this, "Please enter email and password", Toast.LENGTH_SHORT).show();
-                    return;
-                }
-
-                // Try to sign in
-                mAuth.signInWithEmailAndPassword(email, password)
-                        .addOnCompleteListener(MainActivity.this, task -> {
-                            if (task.isSuccessful()) {
-                                // Sign in success
-                                FirebaseUser user = mAuth.getCurrentUser();
-                                navigateToNext(user.getEmail());
-                            } else {
-                                // If sign in fails, try to create a new user (optional, for testing ease)
-                                createAccount(email, password);
-                            }
-                        });
-            }
-        });
+        signBTN.setOnClickListener(v -> handleSignIn());
+        signUpBTN.setOnClickListener(v -> handleSignUp());
     }
 
-    private void createAccount(String email, String password) {
+    private void handleSignIn() {
+        String email = emailET.getText().toString().trim();
+        String password = passwordET.getText().toString().trim();
+
+        if (email.isEmpty() || password.isEmpty()) {
+            Toast.makeText(this, "Please enter email and password", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        mAuth.signInWithEmailAndPassword(email, password)
+                .addOnCompleteListener(this, task -> {
+                    if (task.isSuccessful()) {
+                        checkUserInFirestore(email);
+                    } else {
+                        Toast.makeText(this, "Sign-in failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void handleSignUp() {
+        String email = emailET.getText().toString().trim();
+        String password = passwordET.getText().toString().trim();
+        String firstName = firstNameET.getText().toString().trim();
+        String lastName = lastNameET.getText().toString().trim();
+
+        if (email.isEmpty() || password.isEmpty() || firstName.isEmpty() || lastName.isEmpty()) {
+            Toast.makeText(this, "Please fill all fields for Sign Up", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         mAuth.createUserWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        FirebaseUser user = mAuth.getCurrentUser();
-                        Toast.makeText(MainActivity.this, "Account Created", Toast.LENGTH_SHORT).show();
-                        navigateToNext(user.getEmail());
+                        saveUserToFirestore(email, firstName, lastName);
                     } else {
-                        Toast.makeText(MainActivity.this, "Authentication failed: " + task.getException().getMessage(),
-                                Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Sign-up failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void saveUserToFirestore(String email, String firstName, String lastName) {
+        Map<String, Object> user = new HashMap<>();
+        user.put("email", email);
+        user.put("firstName", firstName);
+        user.put("lastName", lastName);
+        user.put("displayName", firstName + " " + lastName);
+        user.put("createdAt", System.currentTimeMillis());
+
+        db.collection("users").document(mAuth.getCurrentUser().getUid())
+                .set(user)
+                .addOnSuccessListener(aVoid -> {
+                    Toast.makeText(MainActivity.this, "Account Created!", Toast.LENGTH_SHORT).show();
+                    navigateToNext(email);
+                })
+                .addOnFailureListener(e -> {
+                    Toast.makeText(MainActivity.this, "Error saving user: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void checkUserInFirestore(String email) {
+        db.collection("users").document(mAuth.getCurrentUser().getUid()).get()
+                .addOnCompleteListener(task -> {
+                    if (task.isSuccessful() && task.getResult().exists()) {
+                        navigateToNext(email);
+                    } else {
+                        Toast.makeText(this, "User data not found in system.", Toast.LENGTH_SHORT).show();
+                        mAuth.signOut();
                     }
                 });
     }
