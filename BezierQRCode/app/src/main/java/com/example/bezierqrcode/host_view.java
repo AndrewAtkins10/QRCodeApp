@@ -9,6 +9,8 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.zxing.BarcodeFormat;
 import com.journeyapps.barcodescanner.BarcodeEncoder;
 
@@ -18,11 +20,12 @@ import java.util.Random;
 
 public class host_view extends AppCompatActivity {
 
-    private TextView idTV;
+    private TextView idTV, lobbyTV;
     private ImageView qrCodeIV;
     private TextView participantsTV;
     private FirebaseFirestore db;
     private String sessionId;
+    private String sessionName;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,17 +33,24 @@ public class host_view extends AppCompatActivity {
         setContentView(R.layout.activity_host_view);
 
         idTV = findViewById(R.id.idTV);
+        lobbyTV = findViewById(R.id.lobbyTV);
         qrCodeIV = findViewById(R.id.qrCodeIV);
         participantsTV = findViewById(R.id.participantsTV);
 
         db = FirebaseFirestore.getInstance();
+
+        // Get the lobby name from the intent
+        sessionName = getIntent().getStringExtra("LOBBY_NAME");
+        if (sessionName == null || sessionName.isEmpty()) {
+            sessionName = "Untitled Lobby";
+        }
+        lobbyTV.setText(sessionName);
 
         createAttendanceSession();
     }
 
     private void createAttendanceSession() {
         long timestamp = System.currentTimeMillis();
-        // Generate a shorter, 6-character alphanumeric ID for easier manual entry
         sessionId = generateShortId(6);
         String hostId = "SESSION-" + timestamp + "-" + new Random().nextInt(1000);
 
@@ -49,16 +59,15 @@ public class host_view extends AppCompatActivity {
         sessionData.put("attendeeCount", 0);
         sessionData.put("hostId", hostId);
         sessionData.put("sessionId", sessionId);
-        sessionData.put("sessionName", "New Session");
+        sessionData.put("sessionName", sessionName); // Use the user-provided name
         sessionData.put("timestamp", timestamp);
 
-        // Explicitly set the document ID to our custom sessionId
         db.collection("attendance_sessions").document(sessionId)
                 .set(sessionData)
                 .addOnSuccessListener(aVoid -> {
                     idTV.setText("Session ID: " + sessionId);
                     generateQRCode(sessionId);
-                    listenForAttendees(sessionId);
+                    listenForParticipants(sessionId);
                 })
                 .addOnFailureListener(e -> {
                     Toast.makeText(this, "Failed to create session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
@@ -85,13 +94,22 @@ public class host_view extends AppCompatActivity {
         }
     }
 
-    private void listenForAttendees(String sessionId) {
+    private void listenForParticipants(String sessionId) {
         db.collection("attendance_sessions").document(sessionId)
-                .addSnapshotListener((snapshot, e) -> {
+                .collection("participants")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, e) -> {
                     if (e != null) return;
-                    if (snapshot != null && snapshot.exists()) {
-                        Long count = snapshot.getLong("attendeeCount");
-                        participantsTV.setText("Attendees: " + (count != null ? count : 0));
+
+                    if (snapshots != null) {
+                        StringBuilder nameList = new StringBuilder("Participants:\n");
+                        for (QueryDocumentSnapshot doc : snapshots) {
+                            String name = doc.getString("name");
+                            if (name != null) {
+                                nameList.append("• ").append(name).append("\n");
+                            }
+                        }
+                        participantsTV.setText(nameList.toString());
                     }
                 });
     }

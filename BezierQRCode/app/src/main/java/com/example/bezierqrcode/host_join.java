@@ -4,7 +4,9 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -17,6 +19,7 @@ public class host_join extends AppCompatActivity {
     private TextView emailTV2;
     private Button joinBTN;
     private Button hostBTN;
+    private EditText lobbyNameET;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,6 +35,7 @@ public class host_join extends AppCompatActivity {
         emailTV2 = findViewById(R.id.emailTV2);
         joinBTN = findViewById(R.id.joinBTN);
         hostBTN = findViewById(R.id.hostBTN);
+        lobbyNameET = findViewById(R.id.lobbyNameET);
 
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("USER_EMAIL")) {
@@ -50,7 +54,13 @@ public class host_join extends AppCompatActivity {
         hostBTN.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                String lobbyName = lobbyNameET.getText().toString().trim();
+                if (lobbyName.isEmpty()) {
+                    Toast.makeText(host_join.this, "Please enter a lobby name", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 Intent intent = new Intent(host_join.this, host_view.class);
+                intent.putExtra("LOBBY_NAME", lobbyName);
                 startActivity(intent);
             }
         });

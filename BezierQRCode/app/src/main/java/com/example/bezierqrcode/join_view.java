@@ -10,10 +10,15 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.journeyapps.barcodescanner.ScanContract;
 import com.journeyapps.barcodescanner.ScanOptions;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class join_view extends AppCompatActivity {
 
@@ -64,7 +69,6 @@ public class join_view extends AppCompatActivity {
             }
         });
 
-        // Debug button for emulator testing
         debugJoinBTN.setOnClickListener(v -> {
             String sessionId = sessionIdET.getText().toString().trim().toUpperCase();
             if (!sessionId.isEmpty()) {
@@ -77,26 +81,45 @@ public class join_view extends AppCompatActivity {
     }
 
     private void joinSession(String sessionId) {
-        // Query using the Document ID (which is now our custom 6-char ID)
-        db.collection("attendance_sessions").document(sessionId).get()
-                .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists() && Boolean.TRUE.equals(documentSnapshot.getBoolean("active"))) {
-                        db.collection("attendance_sessions").document(sessionId)
-                                .update("attendeeCount", FieldValue.increment(1))
-                                .addOnSuccessListener(aVoid -> {
-                                    Intent intent = new Intent(join_view.this, join_lobby.class);
-                                    intent.putExtra("LOBBY_ID", sessionId);
-                                    startActivity(intent);
-                                })
-                                .addOnFailureListener(e -> {
-                                    Toast.makeText(this, "Update failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                                });
-                    } else {
-                        Toast.makeText(this, "Invalid or inactive session ID: " + sessionId, Toast.LENGTH_LONG).show();
-                    }
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Network Error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        FirebaseUser currentUser = FirebaseAuth.getInstance().getCurrentUser();
+        if (currentUser == null) {
+            Toast.makeText(this, "Please sign in again", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // 1. Fetch the user's display name from Firestore
+        db.collection("users").document(currentUser.getUid()).get()
+                .addOnSuccessListener(userDoc -> {
+                    String name = userDoc.getString("displayName");
+                    if (name == null) name = "Anonymous User";
+                    final String userName = name;
+
+                    // 2. Verify the session exists
+                    db.collection("attendance_sessions").document(sessionId).get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists() && Boolean.TRUE.equals(documentSnapshot.getBoolean("active"))) {
+                                    
+                                    // 3. Add to participants sub-collection
+                                    Map<String, Object> participantData = new HashMap<>();
+                                    participantData.put("name", userName);
+                                    participantData.put("timestamp", FieldValue.serverTimestamp());
+
+                                    db.collection("attendance_sessions").document(sessionId)
+                                            .collection("participants").add(participantData);
+
+                                    // 4. Update the attendeeCount
+                                    db.collection("attendance_sessions").document(sessionId)
+                                            .update("attendeeCount", FieldValue.increment(1))
+                                            .addOnSuccessListener(aVoid -> {
+                                                Intent intent = new Intent(join_view.this, join_lobby.class);
+                                                intent.putExtra("LOBBY_ID", sessionId);
+                                                startActivity(intent);
+                                            });
+                                } else {
+                                    Toast.makeText(this, "Invalid or inactive session ID: " + sessionId, Toast.LENGTH_LONG).show();
+                                }
+                            })
+                            .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
                 });
     }
 }

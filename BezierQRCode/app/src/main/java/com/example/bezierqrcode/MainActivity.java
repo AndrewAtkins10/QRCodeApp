@@ -2,17 +2,18 @@ package com.example.bezierqrcode;
 
 import android.content.Intent;
 import android.os.Bundle;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.firebase.Timestamp;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.firestore.FirebaseFirestore;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -54,9 +55,15 @@ public class MainActivity extends AppCompatActivity {
         mAuth.signInWithEmailAndPassword(email, password)
                 .addOnCompleteListener(this, task -> {
                     if (task.isSuccessful()) {
-                        checkUserInFirestore(email);
+                        FirebaseUser user = mAuth.getCurrentUser();
+                        if (user != null) {
+                            // Update lastLoginAt on successful sign-in
+                            db.collection("users").document(user.getUid())
+                                    .update("lastLoginAt", new Timestamp(new Date()));
+                            checkUserInFirestore(email);
+                        }
                     } else {
-                        Toast.makeText(this, "Sign-in failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Sign-in failed: " + (task.getException() != null ? task.getException().getMessage() : "Check credentials"), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
@@ -77,37 +84,46 @@ public class MainActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         saveUserToFirestore(email, firstName, lastName);
                     } else {
-                        Toast.makeText(this, "Sign-up failed: " + task.getException().getMessage(), Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "Sign-up failed: " + (task.getException() != null ? task.getException().getMessage() : "Unknown error"), Toast.LENGTH_SHORT).show();
                     }
                 });
     }
 
     private void saveUserToFirestore(String email, String firstName, String lastName) {
-        Map<String, Object> user = new HashMap<>();
-        user.put("email", email);
-        user.put("firstName", firstName);
-        user.put("lastName", lastName);
-        user.put("displayName", firstName + " " + lastName);
-        user.put("createdAt", System.currentTimeMillis());
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
 
-        db.collection("users").document(mAuth.getCurrentUser().getUid())
-                .set(user)
+        Timestamp now = new Timestamp(new Date());
+
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("uid", currentUser.getUid());
+        userMap.put("email", email);
+        userMap.put("displayName", firstName + " " + lastName);
+        userMap.put("photoURL", ""); // Default empty string
+        userMap.put("createdAt", now);
+        userMap.put("lastLoginAt", now);
+
+        db.collection("users").document(currentUser.getUid())
+                .set(userMap)
                 .addOnSuccessListener(aVoid -> {
                     Toast.makeText(MainActivity.this, "Account Created!", Toast.LENGTH_SHORT).show();
                     navigateToNext(email);
                 })
                 .addOnFailureListener(e -> {
-                    Toast.makeText(MainActivity.this, "Error saving user: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    Toast.makeText(MainActivity.this, "Firestore Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 });
     }
 
     private void checkUserInFirestore(String email) {
-        db.collection("users").document(mAuth.getCurrentUser().getUid()).get()
+        FirebaseUser currentUser = mAuth.getCurrentUser();
+        if (currentUser == null) return;
+
+        db.collection("users").document(currentUser.getUid()).get()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult().exists()) {
                         navigateToNext(email);
                     } else {
-                        Toast.makeText(this, "User data not found in system.", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(this, "User record not found in Firestore.", Toast.LENGTH_SHORT).show();
                         mAuth.signOut();
                     }
                 });
