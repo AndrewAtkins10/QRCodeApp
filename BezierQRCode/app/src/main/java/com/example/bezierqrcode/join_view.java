@@ -24,7 +24,7 @@ public class join_view extends AppCompatActivity {
 
     private ImageButton cameraButton, backButton;
     private EditText sessionIdET;
-    private Button manualJoinBTN, debugJoinBTN;
+    private Button manualJoinBTN;
     private FirebaseFirestore db;
 
     private final ActivityResultLauncher<ScanOptions> qrCodeLauncher = registerForActivityResult(new ScanContract(),
@@ -48,7 +48,6 @@ public class join_view extends AppCompatActivity {
         backButton = findViewById(R.id.backBTN);
         sessionIdET = findViewById(R.id.sessionIdET);
         manualJoinBTN = findViewById(R.id.manualJoinBTN);
-        debugJoinBTN = findViewById(R.id.debugJoinBTN);
 
         cameraButton.setOnClickListener(v -> {
             ScanOptions options = new ScanOptions();
@@ -68,16 +67,6 @@ public class join_view extends AppCompatActivity {
                 Toast.makeText(this, "Please enter a Session ID", Toast.LENGTH_SHORT).show();
             }
         });
-
-        debugJoinBTN.setOnClickListener(v -> {
-            String sessionId = sessionIdET.getText().toString().trim().toUpperCase();
-            if (!sessionId.isEmpty()) {
-                Toast.makeText(this, "Simulating QR Scan for: " + sessionId, Toast.LENGTH_SHORT).show();
-                joinSession(sessionId);
-            } else {
-                Toast.makeText(this, "Enter an ID in the box first to 'fake' a scan", Toast.LENGTH_LONG).show();
-            }
-        });
     }
 
     private void joinSession(String sessionId) {
@@ -87,19 +76,16 @@ public class join_view extends AppCompatActivity {
             return;
         }
 
-        // 1. Fetch the user's display name from Firestore
         db.collection("users").document(currentUser.getUid()).get()
                 .addOnSuccessListener(userDoc -> {
                     String name = userDoc.getString("displayName");
                     if (name == null) name = "Anonymous User";
                     final String userName = name;
 
-                    // 2. Verify the session exists
                     db.collection("attendance_sessions").document(sessionId).get()
                             .addOnSuccessListener(documentSnapshot -> {
                                 if (documentSnapshot.exists() && Boolean.TRUE.equals(documentSnapshot.getBoolean("active"))) {
                                     
-                                    // 3. Add to participants sub-collection
                                     Map<String, Object> participantData = new HashMap<>();
                                     participantData.put("name", userName);
                                     participantData.put("timestamp", FieldValue.serverTimestamp());
@@ -107,7 +93,6 @@ public class join_view extends AppCompatActivity {
                                     db.collection("attendance_sessions").document(sessionId)
                                             .collection("participants").add(participantData);
 
-                                    // 4. Update the attendeeCount
                                     db.collection("attendance_sessions").document(sessionId)
                                             .update("attendeeCount", FieldValue.increment(1))
                                             .addOnSuccessListener(aVoid -> {
