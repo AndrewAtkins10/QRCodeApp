@@ -54,8 +54,8 @@
 
             <ImageView
                 android:id="@+id/qrCodeIV"
-                android:layout_width="250dp"
-                android:layout_height="250dp" />
+                android:layout_width="200dp"
+                android:layout_height="200dp" />
 
             <TextView
                 android:id="@+id/idTV"
@@ -64,7 +64,7 @@
                 android:layout_marginTop="16dp"
                 android:text="ID: XXXXXX"
                 android:textColor="@color/black"
-                android:textSize="22sp"
+                android:textSize="20sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.1" />
         </LinearLayout>
@@ -74,7 +74,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:layout_marginStart="24dp"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="24dp"
         android:layout_marginEnd="24dp"
         android:layout_marginBottom="32dp"
         app:cardCornerRadius="24dp"
@@ -106,20 +106,13 @@
                 android:layout_marginTop="8dp"
                 android:background="#EEEEEE" />
 
-            <ScrollView
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/participantsRV"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:layout_marginTop="8dp">
+                android:layout_marginTop="8dp"
+                tools:listitem="@layout/participant_item" />
 
-                <TextView
-                    android:id="@+id/participantsTV"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="No participants yet..."
-                    android:textColor="@color/black"
-                    android:textSize="18sp"
-                    android:lineSpacingExtra="8dp" />
-            </ScrollView>
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 

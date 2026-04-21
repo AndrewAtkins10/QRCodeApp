@@ -8,14 +8,19 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QueryDocumentSnapshot;
 import com.google.zxing.BarcodeFormat;
 import com.journeyapps.barcodescanner.BarcodeEncoder;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -23,7 +28,9 @@ public class host_view extends AppCompatActivity {
 
     private TextView idTV, lobbyTV;
     private ImageView qrCodeIV;
-    private TextView participantsTV;
+    private RecyclerView participantsRV;
+    private ParticipantAdapter adapter;
+    private List<Participant> participantList;
     private Button endSessionBTN;
     private FirebaseFirestore db;
     private String sessionId;
@@ -37,12 +44,17 @@ public class host_view extends AppCompatActivity {
         idTV = findViewById(R.id.idTV);
         lobbyTV = findViewById(R.id.lobbyTV);
         qrCodeIV = findViewById(R.id.qrCodeIV);
-        participantsTV = findViewById(R.id.participantsTV);
+        participantsRV = findViewById(R.id.participantsRV);
         endSessionBTN = findViewById(R.id.endSessionBTN);
 
         db = FirebaseFirestore.getInstance();
 
-        // Get the lobby name from the intent
+        // Initialize RecyclerView
+        participantList = new ArrayList<>();
+        adapter = new ParticipantAdapter(participantList, this::removeParticipant);
+        participantsRV.setLayoutManager(new LinearLayoutManager(this));
+        participantsRV.setAdapter(adapter);
+
         sessionName = getIntent().getStringExtra("LOBBY_NAME");
         if (sessionName == null || sessionName.isEmpty()) {
             sessionName = "Untitled Lobby";
@@ -57,20 +69,28 @@ public class host_view extends AppCompatActivity {
                         .update("active", false)
                         .addOnSuccessListener(aVoid -> {
                             Toast.makeText(host_view.this, "Session Ended", Toast.LENGTH_SHORT).show();
-                            finish(); // This will return the user to the previous activity
-                        })
-                        .addOnFailureListener(e -> {
-                            Toast.makeText(host_view.this, "Error ending session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                            finish();
                         });
-            } else {
-                finish();
             }
         });
     }
 
+    private void removeParticipant(Participant participant) {
+        if (sessionId == null) return;
+
+        db.collection("attendance_sessions").document(sessionId)
+                .collection("participants").document(participant.getUid())
+                .delete()
+                .addOnSuccessListener(aVoid -> {
+                    db.collection("attendance_sessions").document(sessionId)
+                            .update("attendeeCount", FieldValue.increment(-1));
+                    Toast.makeText(this, "User removed", Toast.LENGTH_SHORT).show();
+                });
+    }
+
     private void createAttendanceSession() {
-        long timestamp = System.currentTimeMillis();
         sessionId = generateShortId(6);
+        long timestamp = System.currentTimeMillis();
         String hostId = "SESSION-" + timestamp + "-" + new Random().nextInt(1000);
 
         Map<String, Object> sessionData = new HashMap<>();
@@ -84,12 +104,28 @@ public class host_view extends AppCompatActivity {
         db.collection("attendance_sessions").document(sessionId)
                 .set(sessionData)
                 .addOnSuccessListener(aVoid -> {
-                    idTV.setText("Session ID: " + sessionId);
+                    idTV.setText("ID: " + sessionId);
                     generateQRCode(sessionId);
                     listenForParticipants(sessionId);
-                })
-                .addOnFailureListener(e -> {
-                    Toast.makeText(this, "Failed to create session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                });
+    }
+
+    private void listenForParticipants(String sessionId) {
+        db.collection("attendance_sessions").document(sessionId)
+                .collection("participants")
+                .orderBy("timestamp", Query.Direction.ASCENDING)
+                .addSnapshotListener((snapshots, e) -> {
+                    if (e != null || snapshots == null) return;
+
+                    participantList.clear();
+                    for (QueryDocumentSnapshot doc : snapshots) {
+                        String name = doc.getString("name");
+                        String uid = doc.getString("uid");
+                        if (name != null && uid != null) {
+                            participantList.add(new Participant(uid, name));
+                        }
+                    }
+                    adapter.notifyDataSetChanged();
                 });
     }
 
@@ -97,9 +133,7 @@ public class host_view extends AppCompatActivity {
         String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         StringBuilder sb = new StringBuilder();
         Random random = new Random();
-        for (int i = 0; i < length; i++) {
-            sb.append(chars.charAt(random.nextInt(chars.length())));
-        }
+        for (int i = 0; i < length; i++) sb.append(chars.charAt(random.nextInt(chars.length())));
         return sb.toString();
     }
 
@@ -108,28 +142,6 @@ public class host_view extends AppCompatActivity {
             BarcodeEncoder barcodeEncoder = new BarcodeEncoder();
             Bitmap bitmap = barcodeEncoder.encodeBitmap(data, BarcodeFormat.QR_CODE, 400, 400);
             qrCodeIV.setImageBitmap(bitmap);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void listenForParticipants(String sessionId) {
-        db.collection("attendance_sessions").document(sessionId)
-                .collection("participants")
-                .orderBy("timestamp", Query.Direction.ASCENDING)
-                .addSnapshotListener((snapshots, e) -> {
-                    if (e != null) return;
-
-                    if (snapshots != null) {
-                        StringBuilder nameList = new StringBuilder("Participants:\n");
-                        for (QueryDocumentSnapshot doc : snapshots) {
-                            String name = doc.getString("name");
-                            if (name != null) {
-                                nameList.append("• ").append(name).append("\n");
-                            }
-                        }
-                        participantsTV.setText(nameList.toString());
-                    }
-                });
+        } catch (Exception e) { e.printStackTrace(); }
     }
 }
