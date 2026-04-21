@@ -1,11 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#992028</color>
-    <color name="primary_dark">#70161C</color>
-    <color name="accent">#992028</color>
+    <color name="primary">#E114D7</color>
+    <color name="primary_dark">#92028B</color>
+    <color name="accent">#B300AB</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="background">#FDFDFD</color>
+    <color name="background">#92028B</color>
+    <color name="button_color">#B300AB</color>
     <color name="surface">#FFFFFF</color>
     <color name="gray_light">#E0E0E0</color>
+    
+    <!-- New readable text colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#F3E5F5</color> <!-- Very light lavender -->
+    <color name="hint_text">#BDBDBD</color>
 </resources>

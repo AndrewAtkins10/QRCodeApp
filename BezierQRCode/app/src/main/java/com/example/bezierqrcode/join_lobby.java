@@ -2,6 +2,7 @@ package com.example.bezierqrcode;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.activity.EdgeToEdge;
@@ -13,6 +14,7 @@ import androidx.core.view.WindowInsetsCompat;
 public class join_lobby extends AppCompatActivity {
 
     private TextView lobbyIdTV;
+    private Button doneBTN;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,11 +28,20 @@ public class join_lobby extends AppCompatActivity {
         });
 
         lobbyIdTV = findViewById(R.id.lobbyIdTV);
+        doneBTN = findViewById(R.id.doneBTN);
 
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("LOBBY_ID")) {
             String lobbyId = intent.getStringExtra("LOBBY_ID");
             lobbyIdTV.setText("Lobby ID: " + lobbyId);
         }
+
+        doneBTN.setOnClickListener(v -> {
+            // Return to join_view as requested
+            Intent backIntent = new Intent(join_lobby.this, join_view.class);
+            backIntent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(backIntent);
+            finish();
+        });
     }
 }

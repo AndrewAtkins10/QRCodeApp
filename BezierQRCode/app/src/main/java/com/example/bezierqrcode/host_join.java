@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -14,11 +15,14 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.firebase.auth.FirebaseAuth;
+
 public class host_join extends AppCompatActivity {
 
     private TextView emailTV2;
     private Button joinBTN;
     private Button hostBTN;
+    private ImageButton logoutBTN;
     private EditText lobbyNameET;
 
     @Override
@@ -35,6 +39,7 @@ public class host_join extends AppCompatActivity {
         emailTV2 = findViewById(R.id.emailTV2);
         joinBTN = findViewById(R.id.joinBTN);
         hostBTN = findViewById(R.id.hostBTN);
+        logoutBTN = findViewById(R.id.logoutBTN);
         lobbyNameET = findViewById(R.id.lobbyNameET);
 
         Intent intent = getIntent();
@@ -62,6 +67,17 @@ public class host_join extends AppCompatActivity {
                 Intent intent = new Intent(host_join.this, host_view.class);
                 intent.putExtra("LOBBY_NAME", lobbyName);
                 startActivity(intent);
+            }
+        });
+
+        logoutBTN.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FirebaseAuth.getInstance().signOut();
+                Intent intent = new Intent(host_join.this, MainActivity.class);
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                startActivity(intent);
+                finish();
             }
         });
     }

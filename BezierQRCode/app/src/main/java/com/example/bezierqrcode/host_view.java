@@ -2,6 +2,7 @@ package com.example.bezierqrcode;
 
 import android.graphics.Bitmap;
 import android.os.Bundle;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -23,6 +24,7 @@ public class host_view extends AppCompatActivity {
     private TextView idTV, lobbyTV;
     private ImageView qrCodeIV;
     private TextView participantsTV;
+    private Button endSessionBTN;
     private FirebaseFirestore db;
     private String sessionId;
     private String sessionName;
@@ -36,6 +38,7 @@ public class host_view extends AppCompatActivity {
         lobbyTV = findViewById(R.id.lobbyTV);
         qrCodeIV = findViewById(R.id.qrCodeIV);
         participantsTV = findViewById(R.id.participantsTV);
+        endSessionBTN = findViewById(R.id.endSessionBTN);
 
         db = FirebaseFirestore.getInstance();
 
@@ -47,6 +50,22 @@ public class host_view extends AppCompatActivity {
         lobbyTV.setText(sessionName);
 
         createAttendanceSession();
+
+        endSessionBTN.setOnClickListener(v -> {
+            if (sessionId != null) {
+                db.collection("attendance_sessions").document(sessionId)
+                        .update("active", false)
+                        .addOnSuccessListener(aVoid -> {
+                            Toast.makeText(host_view.this, "Session Ended", Toast.LENGTH_SHORT).show();
+                            finish(); // This will return the user to the previous activity
+                        })
+                        .addOnFailureListener(e -> {
+                            Toast.makeText(host_view.this, "Error ending session: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        });
+            } else {
+                finish();
+            }
+        });
     }
 
     private void createAttendanceSession() {
@@ -59,7 +78,7 @@ public class host_view extends AppCompatActivity {
         sessionData.put("attendeeCount", 0);
         sessionData.put("hostId", hostId);
         sessionData.put("sessionId", sessionId);
-        sessionData.put("sessionName", sessionName); // Use the user-provided name
+        sessionData.put("sessionName", sessionName);
         sessionData.put("timestamp", timestamp);
 
         db.collection("attendance_sessions").document(sessionId)

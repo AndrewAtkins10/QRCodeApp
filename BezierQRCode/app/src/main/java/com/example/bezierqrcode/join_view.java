@@ -76,35 +76,59 @@ public class join_view extends AppCompatActivity {
             return;
         }
 
-        db.collection("users").document(currentUser.getUid()).get()
+        String uid = currentUser.getUid();
+
+        // 1. Check if user already joined this specific session
+        db.collection("attendance_sessions").document(sessionId)
+                .collection("participants").document(uid).get()
+                .addOnSuccessListener(documentSnapshot -> {
+                    if (documentSnapshot.exists()) {
+                        // User is already in the participants list
+                        Toast.makeText(this, "You have already joined this session!", Toast.LENGTH_LONG).show();
+                        // Still take them to the lobby so they can see they are in
+                        Intent intent = new Intent(join_view.this, join_lobby.class);
+                        intent.putExtra("LOBBY_ID", sessionId);
+                        startActivity(intent);
+                    } else {
+                        // 2. Not joined yet, proceed with verification and joining
+                        performJoin(sessionId, uid);
+                    }
+                })
+                .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+    }
+
+    private void performJoin(String sessionId, String uid) {
+        db.collection("users").document(uid).get()
                 .addOnSuccessListener(userDoc -> {
                     String name = userDoc.getString("displayName");
                     if (name == null) name = "Anonymous User";
                     final String userName = name;
 
                     db.collection("attendance_sessions").document(sessionId).get()
-                            .addOnSuccessListener(documentSnapshot -> {
-                                if (documentSnapshot.exists() && Boolean.TRUE.equals(documentSnapshot.getBoolean("active"))) {
+                            .addOnSuccessListener(sessionDoc -> {
+                                if (sessionDoc.exists() && Boolean.TRUE.equals(sessionDoc.getBoolean("active"))) {
                                     
                                     Map<String, Object> participantData = new HashMap<>();
                                     participantData.put("name", userName);
+                                    participantData.put("uid", uid);
                                     participantData.put("timestamp", FieldValue.serverTimestamp());
 
+                                    // Add to participants sub-collection using UID as doc name to prevent duplicates
                                     db.collection("attendance_sessions").document(sessionId)
-                                            .collection("participants").add(participantData);
-
-                                    db.collection("attendance_sessions").document(sessionId)
-                                            .update("attendeeCount", FieldValue.increment(1))
+                                            .collection("participants").document(uid).set(participantData)
                                             .addOnSuccessListener(aVoid -> {
+                                                // Update the attendeeCount
+                                                db.collection("attendance_sessions").document(sessionId)
+                                                        .update("attendeeCount", FieldValue.increment(1));
+
                                                 Intent intent = new Intent(join_view.this, join_lobby.class);
                                                 intent.putExtra("LOBBY_ID", sessionId);
                                                 startActivity(intent);
                                             });
                                 } else {
-                                    Toast.makeText(this, "Invalid or inactive session ID: " + sessionId, Toast.LENGTH_LONG).show();
+                                    Toast.makeText(this, "Invalid or inactive session ID", Toast.LENGTH_LONG).show();
                                 }
-                            })
-                            .addOnFailureListener(e -> Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                            });
                 });
     }
 }

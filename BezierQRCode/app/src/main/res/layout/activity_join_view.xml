@@ -19,7 +19,7 @@
         android:src="@android:drawable/ic_menu_revert"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:tint="@color/primary" />
+        app:tint="@color/white" />
 
     <TextView
         android:id="@+id/joinTV"
@@ -27,7 +27,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="64dp"
         android:text="Join Session"
-        android:textColor="@color/black"
+        android:textColor="@color/white"
         android:textSize="28sp"
         android:textStyle="bold"
         app:layout_constraintEnd_toEndOf="parent"
@@ -61,7 +61,8 @@
                 android:hint="Enter Session ID"
                 android:inputType="text"
                 android:padding="12dp"
-                android:textAllCaps="true" />
+                android:textAllCaps="true"
+                android:textColor="@color/black" />
 
             <Button
                 android:id="@+id/manualJoinBTN"
